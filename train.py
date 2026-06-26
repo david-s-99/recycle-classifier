@@ -14,6 +14,7 @@ from recycle_classifier.transforms import get_eval_transforms, get_train_transfo
 
 
 def get_device() -> torch.device:
+    """Choose the fastest available PyTorch device for training."""
     if torch.cuda.is_available():
         return torch.device("cuda")
     if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
@@ -28,6 +29,7 @@ def train_one_epoch(
     optimizer: optim.Optimizer,
     device: torch.device,
 ) -> tuple[float, float]:
+    """Train the model for one full pass over the training DataLoader."""
     model.train()
     total_loss = 0.0
     correct = 0
@@ -37,6 +39,8 @@ def train_one_epoch(
         images = images.to(device)
         labels = labels.to(device)
 
+        # Standard PyTorch training step: clear gradients, run the model,
+        # compute loss, backpropagate, and update trainable parameters.
         optimizer.zero_grad()
         outputs = model(images)
         loss = criterion(outputs, labels)
@@ -44,6 +48,8 @@ def train_one_epoch(
         optimizer.step()
 
         batch_size = labels.size(0)
+        # Track weighted loss and accuracy so the epoch summary accounts for
+        # the final partial batch correctly.
         total_loss += loss.item() * batch_size
         correct += (outputs.argmax(dim=1) == labels).sum().item()
         total += batch_size
@@ -58,6 +64,7 @@ def evaluate(
     criterion: nn.Module,
     device: torch.device,
 ) -> tuple[float, float, list[int], list[int]]:
+    """Evaluate the model and collect labels for a classification report."""
     model.eval()
     total_loss = 0.0
     correct = 0
@@ -77,6 +84,7 @@ def evaluate(
         total_loss += loss.item() * batch_size
         correct += (preds == labels).sum().item()
         total += batch_size
+        # Store CPU lists for scikit-learn metrics after the loop.
         y_true.extend(labels.cpu().tolist())
         y_pred.extend(preds.cpu().tolist())
 
@@ -84,6 +92,7 @@ def evaluate(
 
 
 def parse_args() -> argparse.Namespace:
+    """Read command-line options for dataset paths and training settings."""
     parser = argparse.ArgumentParser(description="Train MobileNetV3 Small for trash/recycle classification.")
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--model-path", type=Path, default=DEFAULT_MODEL_PATH)
@@ -95,13 +104,16 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Train MobileNetV3 on the recycle dataset and save the best checkpoint."""
     args = parse_args()
     train_dir = args.data_dir / "train"
     val_dir = args.data_dir / "val"
 
+    # ImageFolder expects one subdirectory per class under train/ and val/.
     train_dataset = ImageFolder(train_dir, transform=get_train_transforms())
     val_dataset = ImageFolder(val_dir, transform=get_eval_transforms())
 
+    # Fail fast if folder names do not line up with the model's expected labels.
     if train_dataset.classes != CLASS_NAMES:
         raise ValueError(f"Expected classes {CLASS_NAMES}, got {train_dataset.classes}")
     if val_dataset.classes != CLASS_NAMES:
@@ -123,6 +135,7 @@ def main() -> None:
     device = get_device()
     model = build_model(num_classes=len(CLASS_NAMES), freeze_features=True).to(device)
     criterion = nn.CrossEntropyLoss()
+    # Only the classifier head is optimized because the feature extractor is frozen.
     optimizer = optim.Adam(model.classifier.parameters(), lr=args.learning_rate)
 
     best_val_acc = 0.0
@@ -140,6 +153,8 @@ def main() -> None:
         )
 
         if val_acc >= best_val_acc:
+            # Keep the best validation checkpoint so later epochs cannot replace
+            # it with a worse model.
             best_val_acc = val_acc
             torch.save(
                 {
@@ -159,5 +174,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Allows the file to be imported without immediately starting training.
     main()
-
