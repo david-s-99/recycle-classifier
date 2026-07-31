@@ -1,8 +1,8 @@
-torch
-torchvision
-matplotlib
-scikit-learn
-pillow
-streamlit
-numpy
-tqdm
+torch==2.12.0
+torchvision==0.27.0
+matplotlib==3.10.9
+scikit-learn==1.9.0
+pillow==12.2.0
+streamlit==1.58.0
+numpy==2.4.6
+tqdm==4.68.1

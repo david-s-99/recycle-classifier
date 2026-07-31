@@ -9,5 +9,6 @@ models/*
 *.pth
 *.pt
 *.ckpt
+!models/mobilenetv3_small_recycle.pth
 
 .ipynb_checkpoints/
