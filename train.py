@@ -168,6 +168,15 @@ def main() -> None:
                 args.model_path,
             )
 
+    # Reload the saved checkpoint so the final report describes the best model,
+    # rather than whichever model happened to be trained in the final epoch.
+    checkpoint = torch.load(args.model_path, map_location=device, weights_only=True)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    best_val_loss, best_val_acc, y_true, y_pred = evaluate(
+        model, val_loader, criterion, device
+    )
+
+    print(f"Best validation loss: {best_val_loss:.4f}")
     print(f"Best validation accuracy: {best_val_acc:.4f}")
     print(f"Saved model to: {args.model_path}")
     print(classification_report(y_true, y_pred, target_names=CLASS_NAMES))
